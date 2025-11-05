@@ -1,0 +1,14 @@
+{"method":"create_room","params":{"player_name":"Rodrigo"}}
+{"method":"join_room","params":{"room_id":"AN584","player_name":"Lucas"}}
+{"method":"start_game","params":{"room_id":"8b1f4"}}
+{"method":"deal_flop","params":{"room_id":"8b1f4"}}
+{"method":"deal_turn","params":{"room_id":"<id>"}}
+{"method":"deal_river","params":{"room_id":"<id>"}}
+{"method": "player_action", "params": {"room_id": "AB123", "action": "bet", "amount": 50}}
+
+
+
+{"method": "room_created", "params": { "room_id": "AN584" } }
+{"method": "player_joined", "params": { "player": "Lucas" } }
+{"method":"turn_start","params":{"player_id":"123","player":"Rodrigo","pot":0}}
+{"method":"player_action","params":{"player":"Rodrigo","action":"bet","amount":50,"pot":50}}
