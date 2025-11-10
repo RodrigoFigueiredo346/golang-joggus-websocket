@@ -31,22 +31,18 @@ func StartGame(room *model.Room) {
 	}
 	log.Println("min bet: ", room.MinBet)
 
-	// initialize player order and chips
-	room.PlayerOrder = []string{}
-	for id, p := range room.Players {
+	for _, p := range room.Players {
 		p.Chips = 1000
 		p.Active = true
-		room.PlayerOrder = append(room.PlayerOrder, id)
-		log.Println("player order: ", room.PlayerOrder)
-		log.Println("player id: ", p.ID)
 	}
 
 	sb, bb := &model.Player{}, &model.Player{}
 
 	// 🔹 blinds simples (opcional mas realista)
 	if len(room.PlayerOrder) >= 2 {
-		sb = room.Players[room.PlayerOrder[0]]
-		bb = room.Players[room.PlayerOrder[1%len(room.PlayerOrder)]]
+		sb = room.Players[room.PlayerOrder[len(room.PlayerOrder)-2]]
+		bb = room.Players[room.PlayerOrder[len(room.PlayerOrder)-1]]
+		log.Println("len player order: ", len(room.PlayerOrder))
 
 		sbBet := room.MinBet / 2
 		bbBet := room.MinBet
@@ -63,12 +59,14 @@ func StartGame(room *model.Room) {
 		log.Printf("blinds set: %s(SB=%d), %s(BB=%d)\n", sb.Name, sbBet, bb.Name, bbBet)
 	}
 
-	if len(room.PlayerOrder) >= 3 {
-		room.CurrentPlayer = room.PlayerOrder[2%len(room.PlayerOrder)]
-	} else {
-		room.CurrentPlayer = room.PlayerOrder[0]
-	}
-	StartTurn(room)
+	// if len(room.PlayerOrder) >= 3 {
+	// 	room.CurrentPlayer = room.PlayerOrder[2%len(room.PlayerOrder)]
+	// } else {
+	// 	room.CurrentPlayer = room.PlayerOrder[0]
+	// }
+	room.CurrentPlayer = room.PlayerOrder[0]
+
+	// StartTurn(room)
 
 	// distribuir cartas privadas
 	playersInfo := []map[string]any{}

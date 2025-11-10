@@ -41,6 +41,7 @@ func CreateRoom(conn *websocket.Conn, playerID, playerName string) {
 		CurrentBet:     0,
 		MinBet:         10,
 		RoundNumber:    1,
+		PlayerOrder:    []string{playerID},
 	}
 
 	room.Players[playerID] = player

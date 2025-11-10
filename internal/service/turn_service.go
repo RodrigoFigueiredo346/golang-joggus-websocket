@@ -28,9 +28,10 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 	case "fold":
 		p.Active = false
 		log.Printf("%s folded\n", p.Name)
-		NextPlayer(room)
+		room.Pot += p.CurrentBet
+		p.Chips -= p.CurrentBet
+		// NextPlayer(room)
 	case "check":
-		log.Println("p.CurrentBet: ", p.CurrentBet)
 		log.Println("room.CurrentBet: ", room.CurrentBet)
 		if room.CurrentBet > 0 {
 			// se há aposta, check é inválido → deve ser call
@@ -43,14 +44,17 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 				p.CurrentBet += diff
 				room.Pot += diff
 				amount = diff
+				p.TotalBet += diff
 				log.Printf("%s auto-called (%d) instead of check\n", p.Name, diff)
 			} else {
 				amount = 0
+				//ver se é necessario setar p.currentbet = 0?
 			}
 		}
-		log.Printf("%d checked\n", p.CurrentBet)
-		NextPlayer(room)
+		log.Println("p.CurrentBet", p.CurrentBet)
+		// NextPlayer(room)
 	case "call":
+		log.Println("p.CurrentBet: ", p.CurrentBet)
 		diff := room.CurrentBet - p.CurrentBet
 		if diff > 0 {
 			if diff > p.Chips {
@@ -60,9 +64,10 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 			p.CurrentBet += diff
 			room.Pot += diff
 			amount = diff
+			p.TotalBet += diff
 		}
 		log.Printf("%d called\n", p.CurrentBet)
-		NextPlayer(room)
+		// NextPlayer(room)
 	case "bet", "raise":
 		if amount <= 0 {
 			log.Printf("invalid bet amount from %s\n", p.Name)
@@ -72,7 +77,8 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 			amount = p.Chips
 		}
 		p.Chips -= amount
-		p.CurrentBet += amount
+		p.CurrentBet = amount
+		p.TotalBet += amount
 		room.Pot += amount
 		if p.CurrentBet > room.CurrentBet {
 			room.CurrentBet = p.CurrentBet
@@ -84,7 +90,7 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 			}
 		}
 		log.Printf("%s bet %d\n", p.Name, amount)
-		NextPlayer(room)
+		// NextPlayer(room)
 	case "allin":
 		amount = p.Chips
 		p.Chips = 0
@@ -94,7 +100,7 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 			room.CurrentBet = p.CurrentBet
 		}
 		log.Printf("%s went all-in with %d\n", p.Name, amount)
-		NextPlayer(room)
+		// NextPlayer(room)
 	default:
 		log.Printf("unknown action from %s: %s\n", p.Name, action)
 		return
@@ -103,14 +109,17 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 	// marca como tendo agido
 	p.HasActed = true
 
+	nextPlayer := NextPlayer(room)
+
 	// broadcast da ação
 	msg := map[string]any{
 		"method": "player_action",
 		"params": map[string]any{
-			"player_id": p.ID,
-			"action":    action,
-			"amount":    amount,
-			"pot":       room.Pot,
+			"player_id":   p.ID,
+			"action":      action,
+			"amount":      amount,
+			"pot":         room.Pot,
+			"next_player": nextPlayer,
 		},
 	}
 	count := 0
@@ -147,6 +156,20 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 
 }
 
+func NextPlayer(room *model.Room) string {
+	if len(room.PlayerOrder) == 0 {
+		return ""
+	}
+	for i, id := range room.PlayerOrder {
+		if id == room.CurrentPlayer {
+			room.CurrentPlayer = room.PlayerOrder[(i+1)%len(room.PlayerOrder)]
+			break
+		}
+	}
+	// broadcastTurn(room)
+	return room.CurrentPlayer
+}
+
 func AllPlayersActed(room *model.Room) bool {
 	activeCount := 0
 	actedCount := 0
@@ -161,41 +184,29 @@ func AllPlayersActed(room *model.Room) bool {
 	}
 	return activeCount > 0 && actedCount == activeCount
 }
-func StartTurn(room *model.Room) {
-	log.Println("StartTurn...")
-	if len(room.PlayerOrder) == 0 {
-		for id := range room.Players {
-			room.PlayerOrder = append(room.PlayerOrder, id)
-		}
-	}
-	room.CurrentPlayer = room.PlayerOrder[0]
-	broadcastTurn(room)
-}
 
-func NextPlayer(room *model.Room) {
-	if len(room.PlayerOrder) == 0 {
-		return
-	}
-	for i, id := range room.PlayerOrder {
-		if id == room.CurrentPlayer {
-			room.CurrentPlayer = room.PlayerOrder[(i+1)%len(room.PlayerOrder)]
-			break
-		}
-	}
-	broadcastTurn(room)
-}
+// func StartTurn(room *model.Room) {
+// 	log.Println("StartTurn...")
+// 	if len(room.PlayerOrder) == 0 {
+// 		for id := range room.Players {
+// 			room.PlayerOrder = append(room.PlayerOrder, id)
+// 		}
+// 	}
+// 	room.CurrentPlayer = room.PlayerOrder[0]
+// 	broadcastTurn(room)
+// }
 
-func broadcastTurn(room *model.Room) {
-	msg := map[string]any{
-		"method": "turn_start",
-		"params": map[string]any{
-			"player_id": room.CurrentPlayer,
-			"player":    room.Players[room.CurrentPlayer].ID,
-			"pot":       room.Pot,
-		},
-	}
-	data, _ := json.Marshal(msg)
-	log.Println("sending => msg:", string(data))
-	b, _ := json.Marshal(msg)
-	room.Broadcast <- b
-}
+// func broadcastTurn(room *model.Room) {
+// 	msg := map[string]any{
+// 		"method": "turn_start",
+// 		"params": map[string]any{
+// 			"player_id": room.CurrentPlayer,
+// 			"player":    room.Players[room.CurrentPlayer].ID,
+// 			"pot":       room.Pot,
+// 		},
+// 	}
+// 	data, _ := json.Marshal(msg)
+// 	log.Println("sending => msg:", string(data))
+// 	b, _ := json.Marshal(msg)
+// 	room.Broadcast <- b
+// }
