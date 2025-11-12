@@ -38,7 +38,6 @@ func StartGame(room *model.Room) {
 
 	sb, bb := &model.Player{}, &model.Player{}
 
-	// 🔹 blinds simples (opcional mas realista)
 	if len(room.PlayerOrder) >= 2 {
 		sb = room.Players[room.PlayerOrder[len(room.PlayerOrder)-2]]
 		bb = room.Players[room.PlayerOrder[len(room.PlayerOrder)-1]]
@@ -66,9 +65,6 @@ func StartGame(room *model.Room) {
 	// }
 	room.CurrentPlayer = room.PlayerOrder[0]
 
-	// StartTurn(room)
-
-	// distribuir cartas privadas
 	playersInfo := []map[string]any{}
 	for _, pl := range room.Players {
 		info := map[string]any{
@@ -119,10 +115,11 @@ func StartGame(room *model.Room) {
 func DealFlop(room *model.Room) {
 	log.Println("DealFlop...")
 	resetAct(room)
-	if room.State != model.StateFlop {
+	if room.State != model.StatePreflop {
 		log.Println("flop error: wrong state, current:", room.State)
 		return
 	}
+	room.State = model.StateFlop
 
 	cards := room.Deck.Draw(3)
 	room.CommunityCards = append(room.CommunityCards, cards...)
@@ -135,16 +132,17 @@ func DealFlop(room *model.Room) {
 	room.Broadcast <- b
 
 	log.Printf("flop dealt in room %s\n", room.ID)
-	NextPhase(room)
+	// NextPhase(room)
 }
 
 func DealTurn(room *model.Room) {
 	log.Println("DealTurn...")
 	resetAct(room)
-	if room.State != model.StateTurn {
+	if room.State != model.StateFlop {
 		log.Println("turn error: wrong state, current:", room.State)
 		return
 	}
+	room.State = model.StateTurn
 
 	card := room.Deck.Draw(1)
 	room.CommunityCards = append(room.CommunityCards, card...)
@@ -157,16 +155,17 @@ func DealTurn(room *model.Room) {
 	room.Broadcast <- b
 
 	log.Printf("turn dealt in room %s\n", room.ID)
-	NextPhase(room)
+	// NextPhase(room)
 }
 
 func DealRiver(room *model.Room) {
 	log.Println("DealRiver...")
 	resetAct(room)
-	if room.State != model.StateRiver {
+	if room.State != model.StateTurn {
 		log.Println("river error: wrong state, current:", room.State)
 		return
 	}
+	room.State = model.StateRiver
 
 	card := room.Deck.Draw(1)
 	room.CommunityCards = append(room.CommunityCards, card...)
@@ -179,33 +178,30 @@ func DealRiver(room *model.Room) {
 	room.Broadcast <- b
 
 	log.Printf("river dealt in room %s\n", room.ID)
-	NextPhase(room)
+	// NextPhase(room)
 
 }
 
-func NextPhase(room *model.Room) {
-	log.Println("NextPhase:...")
-	switch room.State {
-	case model.StateWaiting:
-		log.Println("==> waiting state")
-		room.State = model.StatePreflop
-	case model.StatePreflop:
-		log.Println("==> going StateFlop state")
-		room.State = model.StateFlop
-	case model.StateFlop:
-		log.Println("==> going StateTurn state")
-		room.State = model.StateTurn
-	case model.StateTurn:
-		log.Println("==> going StateRiver state")
-		room.State = model.StateRiver
-	case model.StateRiver:
-		log.Println("==> going StateShowdown state")
-		room.State = model.StateShowdown
-	case model.StateShowdown:
-		log.Println("==> showdown state")
-		// room.State = model.StateWaiting
-	}
-}
+// func NextPhase(room *model.Room) {
+// 	log.Println("TROCANDO DE FASE:")
+// 	log.Println("fase atual: ", room.State)
+// 	switch room.State {
+// 	case model.StateWaiting:
+// 		room.State = model.StatePreflop
+// 	case model.StatePreflop:
+// 		room.State = model.StateFlop
+// 	case model.StateFlop:
+// 		room.State = model.StateTurn
+// 	case model.StateTurn:
+// 		room.State = model.StateRiver
+// 	case model.StateRiver:
+// 		room.State = model.StateShowdown
+// 	case model.StateShowdown:
+// 		room.State = model.StateWaiting
+// 	}
+// 	log.Println("fase nova: ", room.State)
+
+// }
 
 func resetAct(room *model.Room) {
 	for _, p := range room.Players {

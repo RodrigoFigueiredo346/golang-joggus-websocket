@@ -122,13 +122,13 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 			"next_player": nextPlayer,
 		},
 	}
-	count := 0
-	for _, pl := range room.Players {
-		if pl.Connected {
-			count++
-		}
-	}
-	log.Printf("broadcasting (player action) action to %d connected players:", count)
+	// count := 0
+	// for _, pl := range room.Players {
+	// 	if pl.Connected {
+	// 		count++
+	// 	}
+	// }
+	// log.Printf("broadcasting (player action) action to %d connected players:", count)
 
 	b, _ := json.Marshal(msg)
 	room.Broadcast <- b
@@ -136,24 +136,25 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 	// checa se rodada terminou
 	if AllPlayersActed(room) {
 		log.Printf("all active players acted in %s phase\n", room.State)
-		NextPhase(room)
+		// NextPhase(room)
 		switch room.State {
-		case model.StateFlop:
+		case model.StatePreflop:
 			log.Println("calling the flop phase")
 			DealFlop(room)
-		case model.StateTurn:
+		case model.StateFlop:
 			log.Println("calling the turn phase")
 			DealTurn(room)
-		case model.StateRiver:
+		case model.StateTurn:
 			log.Println("calling the river phase")
 			DealRiver(room)
-		case model.StateShowdown:
+		case model.StateRiver:
 			log.Println("calling the showdown phase")
 			Showdown(room)
+			// case model.StateShowdown:
+
 		}
 		return
 	}
-
 }
 
 func NextPlayer(room *model.Room) string {

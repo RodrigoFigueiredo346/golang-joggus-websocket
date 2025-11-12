@@ -8,45 +8,33 @@ import (
 )
 
 func Showdown(room *model.Room) {
-	log.Println("Showdown...")
 	if room.GameOver {
 		return
 	}
+	room.State = model.StateShowdown
 
-	activePlayers := []*model.Player{}
+	active := []*model.Player{}
 	for _, p := range room.Players {
-		if p.Active && p.Chips > 0 {
-			activePlayers = append(activePlayers, p)
+		if p.Active && p.Chips >= 0 {
+			active = append(active, p)
 		}
 	}
-
-	if len(activePlayers) == 0 {
-		log.Println("showdown error: no active players")
+	if len(active) == 0 {
 		return
 	}
 
-	evaluated := []EvaluatedHand{}
-	for _, p := range activePlayers {
-		playerCards := append(append([]model.Card{}, room.CommunityCards...), p.Hand...)
-		rank, high := EvaluateHand(playerCards)
-		evaluated = append(evaluated, EvaluatedHand{
-			PlayerID: p.ID,
-			Rank:     rank,
-			HighCard: high,
-		})
+	scores := map[string]HandScore{}
+	for _, p := range active {
+		all := append(append([]model.Card{}, room.CommunityCards...), p.Hand...)
+		scores[p.ID] = EvaluateBest5From7(all)
 	}
 
-	winners := GetWinnersHand(evaluated)
-
-	split := room.Pot / len(winners)
-	for _, w := range winners {
-		room.Players[w.PlayerID].Chips += split
-		log.Printf("%s wins %d chips (split)\n", room.Players[w.PlayerID].Name, split)
-	}
-
+	winnerIDs := GetWinnersByScore(scores)
+	split := room.Pot / len(winnerIDs)
 	names := []string{}
-	for _, w := range winners {
-		names = append(names, room.Players[w.PlayerID].Name)
+	for _, id := range winnerIDs {
+		room.Players[id].Chips += split
+		names = append(names, room.Players[id].Name)
 	}
 
 	msg := map[string]any{
@@ -58,17 +46,14 @@ func Showdown(room *model.Room) {
 		},
 	}
 	b, _ := json.Marshal(msg)
-
 	select {
 	case room.Broadcast <- b:
 	default:
-		log.Println("showdown broadcast skipped (buffer full)")
 	}
 
 	resetRoomShowDown(room)
-
 	if !checkGameOverShowDown(room) {
-		go startNewRoundShowDown(room) // async to avoid blocking writes
+		go startNewRoundShowDown(room)
 	}
 }
 
