@@ -40,7 +40,7 @@ func CreateRoom(conn *websocket.Conn, playerID, playerName string) {
 		Pot:            0,
 		CurrentBet:     0,
 		MinBet:         10,
-		RoundNumber:    1,
+		RoundNumber:    0,
 		PlayerOrder:    []string{playerID},
 	}
 
@@ -49,7 +49,7 @@ func CreateRoom(conn *websocket.Conn, playerID, playerName string) {
 	Server.Rooms[roomID] = room
 	Server.Mu.Unlock()
 
-	go room.Run()
+	go room.Run() // fica ouvindo nos canais
 
 	resp := map[string]any{
 		"method": "room_created",

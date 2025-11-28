@@ -25,16 +25,14 @@ func StartGame(room *model.Room) {
 	room.Deck.Shuffle()
 	room.CommunityCards = []model.Card{}
 	room.State = model.StatePreflop
-	room.RoundNumber++
-	if room.RoundNumber > 0 && room.RoundNumber%3 == 0 {
-		room.MinBet = room.MinBet + 10
-	}
-	log.Println("min bet: ", room.MinBet)
+	// RoundNumber already initialized to 0 at room creation
+	// MinBet already set to initial value (10) at room creation
+	log.Printf("Starting first game, MinBet: %d\n", room.MinBet)
 
-	for _, p := range room.Players {
-		p.Chips = 1000
-		p.Active = true
-	}
+	// for _, p := range room.Players {
+	// 	p.Chips = 1000
+	// 	p.Active = true
+	// }
 
 	sb, bb := &model.Player{}, &model.Player{}
 
@@ -96,20 +94,111 @@ func StartGame(room *model.Room) {
 				"min_bet":        room.MinBet,
 			},
 		}
-		by, _ := json.Marshal(msg)
+		bytes, _ := json.Marshal(msg)
 
-		player.SendChan <- by
+		player.SendChan <- bytes
 
 	}
 
-	count := 0
-	for _, pl := range room.Players {
-		if pl.Connected {
-			count++
-		}
-	}
+	// count := 0
+	// for _, pl := range room.Players {
+	// 	if pl.Connected {
+	// 		count++
+	// 	}
+	// }
 
 	log.Printf("game started in room %s with %d players\n", room.ID, len(room.Players))
+}
+
+func StartNextRound(room *model.Room) {
+	log.Println("StartNextRound...")
+
+	if len(room.Players) < 2 {
+		log.Println("start_next_round error: not enough players")
+		return
+	}
+	if room.State != model.StateWaiting {
+		log.Println("start_next_round error: game already in progress")
+		return
+	}
+
+	// Increment round number
+	room.RoundNumber++
+
+	// Increment MinBet every 3 rounds
+	if room.RoundNumber > 0 && room.RoundNumber%3 == 0 {
+		room.MinBet = room.MinBet + 10
+	}
+	log.Printf("Round %d, MinBet: %d\n", room.RoundNumber, room.MinBet)
+
+	// Create new deck and shuffle
+	room.Deck = model.NewDeck()
+	room.Deck.Shuffle()
+	room.CommunityCards = []model.Card{}
+	room.State = model.StatePreflop
+
+	resetAct(room)
+
+	// Set small blind and big blind
+	sb, bb := &model.Player{}, &model.Player{}
+	if len(room.PlayerOrder) >= 2 {
+		sb = room.Players[room.PlayerOrder[len(room.PlayerOrder)-2]]
+		bb = room.Players[room.PlayerOrder[len(room.PlayerOrder)-1]]
+
+		sbBet := room.MinBet / 2
+		bbBet := room.MinBet
+		sb.Chips -= sbBet
+		sb.CurrentBet = sbBet
+
+		bb.Chips -= bbBet
+		bb.CurrentBet = bbBet
+
+		room.Pot += sbBet + bbBet
+		room.CurrentBet = bbBet
+
+		log.Printf("blinds set: %s(SB=%d), %s(BB=%d)\n", sb.Name, sbBet, bb.Name, bbBet)
+	}
+
+	room.CurrentPlayer = room.PlayerOrder[0]
+
+	// Prepare player information
+	playersInfo := []map[string]any{}
+	for _, pl := range room.Players {
+		info := map[string]any{
+			"name":      pl.Name,
+			"chips":     pl.Chips,
+			"player_id": pl.ID,
+		}
+		if pl.ID == sb.ID {
+			info["blind"] = "sb"
+		}
+		if pl.ID == bb.ID {
+			info["blind"] = "bb"
+		}
+		playersInfo = append(playersInfo, info)
+	}
+
+	// Deal cards and send game_started to each player
+	for _, player := range room.Players {
+		hand := room.Deck.Draw(2)
+		player.Hand = hand
+
+		msg := map[string]any{
+			"method": "game_started",
+			"params": map[string]any{
+				"room_id":        room.ID,
+				"players":        playersInfo,
+				"your_hand":      player.Hand,
+				"pot":            room.Pot,
+				"current_player": room.Players[room.CurrentPlayer].Name,
+				"min_bet":        room.MinBet,
+			},
+		}
+		bytes, _ := json.Marshal(msg)
+		player.SendChan <- bytes
+	}
+
+	log.Printf("next round started in room %s with %d players\n", room.ID, len(room.Players))
 }
 
 func DealFlop(room *model.Room) {

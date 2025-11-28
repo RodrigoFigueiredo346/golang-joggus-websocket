@@ -114,7 +114,23 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				log.Println("invalid params:", err)
 				continue
 			}
-			controller.StartGame(p.RoomID)
+
+			// Intelligently choose which method to use based on room state
+			controller.Server.Mu.RLock()
+			room, exists := controller.Server.Rooms[p.RoomID]
+			controller.Server.Mu.RUnlock()
+
+			if !exists {
+				log.Println("start_game error: room not found")
+				continue
+			}
+
+			// Use StartGame for first round (RoundNumber == 0), StartNextRound for subsequent rounds
+			if room.RoundNumber == 0 {
+				controller.StartGame(p.RoomID)
+			} else {
+				controller.StartNextRound(p.RoomID)
+			}
 		case "player_action":
 			var p struct {
 				RoomID   string `json:"room_id"`

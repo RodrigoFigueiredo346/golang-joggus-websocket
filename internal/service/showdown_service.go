@@ -37,12 +37,17 @@ func Showdown(room *model.Room) {
 		names = append(names, room.Players[id].Name)
 	}
 
+	// Get winning hand details from the first winner (all winners have the same score)
+	winningScore := scores[winnerIDs[0]]
+
 	msg := map[string]any{
 		"method": "showdown",
 		"params": map[string]any{
 			"winners": names,
 			"amount":  room.Pot,
 			"split":   split,
+			"hand":    winningScore.Rank.String(),
+			"cards":   winningScore.Cards,
 		},
 	}
 	b, _ := json.Marshal(msg)
@@ -52,43 +57,50 @@ func Showdown(room *model.Room) {
 	}
 
 	resetRoomShowDown(room)
-	if !checkGameOverShowDown(room) {
-		go startNewRoundShowDown(room)
-	}
+	checkGameOverShowDown(room)
 }
 
 func resetRoomShowDown(room *model.Room) {
 	log.Println("resetRoomShowDown...")
 	room.Pot = 0
 	room.CurrentBet = 0
-	room.MinBet = room.MinBet + 10
 	room.CommunityCards = []model.Card{}
 	room.Deck = nil
 	room.State = model.StateWaiting
+
+	// Rebuild PlayerOrder to include only players with chips
+	newPlayerOrder := []string{}
 	for _, p := range room.Players {
 		p.CurrentBet = 0
 		p.TotalBet = 0
-		p.Active = p.Chips > 0
 		p.Hand = []model.Card{}
+		if p.Chips > 0 {
+			p.Active = true
+			newPlayerOrder = append(newPlayerOrder, p.ID)
+		} else {
+			p.Active = false
+		}
 	}
+	room.PlayerOrder = newPlayerOrder
+	log.Printf("PlayerOrder rebuilt with %d players\n", len(room.PlayerOrder))
 }
 
 func startNewRoundShowDown(room *model.Room) {
 	log.Println("startNewRoundShowDown...")
 	room.RoundNumber++
-	msg := map[string]any{
-		"method": "new_round",
-		"params": map[string]any{
-			"round": room.RoundNumber,
-		},
-	}
-	b, _ := json.Marshal(msg)
+	// msg := map[string]any{
+	// 	"method": "new_round",
+	// 	"params": map[string]any{
+	// 		"round": room.RoundNumber,
+	// 	},
+	// }
+	// b, _ := json.Marshal(msg)
 
-	select {
-	case room.Broadcast <- b:
-	default:
-		log.Println("new_round broadcast skipped (buffer full)")
-	}
+	// select {
+	// case room.Broadcast <- b:
+	// default:
+	// 	log.Println("new_round broadcast skipped (buffer full)")
+	// }
 
 	go StartGame(room)
 }

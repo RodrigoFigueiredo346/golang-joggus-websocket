@@ -18,6 +18,17 @@ func StartGame(roomID string) {
 	service.StartGame(room)
 }
 
+func StartNextRound(roomID string) {
+	Server.Mu.RLock()
+	room, exists := Server.Rooms[roomID]
+	Server.Mu.RUnlock()
+	if !exists {
+		log.Println("start_next_round error: room not found")
+		return
+	}
+	service.StartNextRound(room)
+}
+
 func DealFlop(roomID string) {
 	Server.Mu.RLock()
 	room, exists := Server.Rooms[roomID]

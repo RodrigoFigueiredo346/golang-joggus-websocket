@@ -23,6 +23,7 @@ const (
 type HandScore struct {
 	Rank     HandRank
 	Tiebreak []int
+	Cards    []model.Card
 }
 
 type EvaluatedHand struct {
@@ -146,7 +147,7 @@ func eval5(cs []model.Card) HandScore {
 	cnt, order := countRanks(cs)
 	okSF, hiSF := isStraightFlush(cs)
 	if okSF {
-		return HandScore{StraightFlush, []int{hiSF}}
+		return HandScore{StraightFlush, []int{hiSF}, nil}
 	}
 	for _, k := range order {
 		if cnt[k] == 4 {
@@ -157,7 +158,7 @@ func eval5(cs []model.Card) HandScore {
 				}
 			}
 			sort.Slice(kickers, func(i, j int) bool { return kickers[i] > kickers[j] })
-			return HandScore{FourOfKind, []int{k, kickers[0]}}
+			return HandScore{FourOfKind, []int{k, kickers[0]}, nil}
 		}
 	}
 	three := -1
@@ -173,15 +174,15 @@ func eval5(cs []model.Card) HandScore {
 		}
 	}
 	if three != -1 && pair != -1 {
-		return HandScore{FullHouse, []int{three, pair}}
+		return HandScore{FullHouse, []int{three, pair}, nil}
 	}
 	if f, ok := pickFlush(cs); ok {
 		v := valueSlice(f)
 		sort.Slice(v, func(i, j int) bool { return v[i] > v[j] })
-		return HandScore{Flush, v}
+		return HandScore{Flush, v, nil}
 	}
 	if ok, hi := straightHigh(vals); ok {
-		return HandScore{Straight, []int{hi}}
+		return HandScore{Straight, []int{hi}, nil}
 	}
 	if three != -1 {
 		kickers := []int{}
@@ -190,7 +191,7 @@ func eval5(cs []model.Card) HandScore {
 				kickers = append(kickers, vals[i])
 			}
 		}
-		return HandScore{ThreeOfKind, []int{three, kickers[0], kickers[1]}}
+		return HandScore{ThreeOfKind, []int{three, kickers[0], kickers[1]}, nil}
 	}
 	pairs := []int{}
 	for _, k := range order {
@@ -207,7 +208,7 @@ func eval5(cs []model.Card) HandScore {
 				break
 			}
 		}
-		return HandScore{TwoPair, []int{pairs[0], pairs[1], kicker}}
+		return HandScore{TwoPair, []int{pairs[0], pairs[1], kicker}, nil}
 	}
 	if len(pairs) == 1 {
 		kickers := []int{}
@@ -216,13 +217,13 @@ func eval5(cs []model.Card) HandScore {
 				kickers = append(kickers, vals[i])
 			}
 		}
-		return HandScore{OnePair, []int{pairs[0], kickers[0], kickers[1], kickers[2]}}
+		return HandScore{OnePair, []int{pairs[0], kickers[0], kickers[1], kickers[2]}, nil}
 	}
 	v := uniqDesc(vals)
 	for len(v) < 5 {
 		v = append(v, 0)
 	}
-	return HandScore{HighCard, v[:5]}
+	return HandScore{HighCard, v[:5], nil}
 }
 
 func compareScore(a, b HandScore) int {
@@ -245,7 +246,7 @@ func compareScore(a, b HandScore) int {
 }
 
 func EvaluateBest5From7(cards []model.Card) HandScore {
-	best := HandScore{Rank: HighCard, Tiebreak: []int{0}}
+	best := HandScore{Rank: HighCard, Tiebreak: []int{0}, Cards: nil}
 	n := len(cards)
 	for a := 0; a < n-4; a++ {
 		for b := a + 1; b < n-3; b++ {
@@ -254,6 +255,7 @@ func EvaluateBest5From7(cards []model.Card) HandScore {
 					for e := d + 1; e < n; e++ {
 						hand := []model.Card{cards[a], cards[b], cards[c], cards[d], cards[e]}
 						s := eval5(hand)
+						s.Cards = hand
 						if compareScore(s, best) > 0 {
 							best = s
 						}

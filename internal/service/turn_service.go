@@ -28,9 +28,17 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 	case "fold":
 		p.Active = false
 		log.Printf("%s folded\n", p.Name)
-		room.Pot += p.CurrentBet
-		p.Chips -= p.CurrentBet
-		// NextPlayer(room)
+		// Remove player from PlayerOrder during this round
+		for i, id := range room.PlayerOrder {
+			if id == p.ID {
+				room.PlayerOrder = append(room.PlayerOrder[:i], room.PlayerOrder[i+1:]...)
+				break
+			}
+		}
+		// Adjust current player index if needed
+		if len(room.PlayerOrder) == 0 {
+			room.CurrentPlayer = ""
+		}
 	case "check":
 		log.Println("room.CurrentBet: ", room.CurrentBet)
 		if room.CurrentBet > 0 {
@@ -73,13 +81,19 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 			log.Printf("invalid bet amount from %s\n", p.Name)
 			return
 		}
-		if amount > p.Chips {
-			amount = p.Chips
+		// Calculate the actual amount to add (total desired bet - current bet)
+		diff := amount - p.CurrentBet
+		if diff <= 0 {
+			log.Printf("invalid raise amount from %s (must be higher than current bet)\n", p.Name)
+			return
 		}
-		p.Chips -= amount
-		p.CurrentBet = amount
-		p.TotalBet += amount
-		room.Pot += amount
+		if diff > p.Chips {
+			diff = p.Chips
+		}
+		p.Chips -= diff
+		p.CurrentBet += diff
+		p.TotalBet += diff
+		room.Pot += diff
 		if p.CurrentBet > room.CurrentBet {
 			room.CurrentBet = p.CurrentBet
 			// se houve aumento, outros devem agir novamente
@@ -89,8 +103,7 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 				}
 			}
 		}
-		log.Printf("%s bet %d\n", p.Name, amount)
-		// NextPlayer(room)
+		log.Printf("%s bet/raised to %d (added %d)\n", p.Name, p.CurrentBet, diff)
 	case "allin":
 		amount = p.Chips
 		p.Chips = 0
@@ -133,6 +146,42 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 	b, _ := json.Marshal(msg)
 	room.Broadcast <- b
 
+	// Check if only one active player remains (automatic win)
+	activeCount := 0
+	var lastActive *model.Player
+	for _, player := range room.Players {
+		if player.Active {
+			activeCount++
+			lastActive = player
+		}
+	}
+
+	if activeCount == 1 && lastActive != nil {
+		log.Printf("only one active player remains: %s wins automatically\n", lastActive.Name)
+		// Award pot to the winner
+		lastActive.Chips += room.Pot
+
+		winMsg := map[string]any{
+			"method": "automatic_win",
+			"params": map[string]any{
+				"winner": lastActive.Name,
+				"amount": room.Pot,
+			},
+		}
+		winBytes, _ := json.Marshal(winMsg)
+		select {
+		case room.Broadcast <- winBytes:
+		default:
+		}
+
+		// Reset and start new round
+		resetRoomShowDown(room)
+		if !checkGameOverShowDown(room) {
+			go startNewRoundShowDown(room)
+		}
+		return
+	}
+
 	// checa se rodada terminou
 	if AllPlayersActed(room) {
 		log.Printf("all active players acted in %s phase\n", room.State)
@@ -161,14 +210,33 @@ func NextPlayer(room *model.Room) string {
 	if len(room.PlayerOrder) == 0 {
 		return ""
 	}
+	// Find current player index
+	currentIdx := -1
 	for i, id := range room.PlayerOrder {
 		if id == room.CurrentPlayer {
-			room.CurrentPlayer = room.PlayerOrder[(i+1)%len(room.PlayerOrder)]
+			currentIdx = i
 			break
 		}
 	}
-	// broadcastTurn(room)
-	return room.CurrentPlayer
+
+	if currentIdx == -1 {
+		// Current player not found, start from beginning
+		currentIdx = 0
+	}
+
+	// Find next active player
+	for i := 1; i <= len(room.PlayerOrder); i++ {
+		nextIdx := (currentIdx + i) % len(room.PlayerOrder)
+		nextID := room.PlayerOrder[nextIdx]
+		if room.Players[nextID].Active {
+			room.CurrentPlayer = nextID
+			return room.CurrentPlayer
+		}
+	}
+
+	// No active players found
+	room.CurrentPlayer = ""
+	return ""
 }
 
 func AllPlayersActed(room *model.Room) bool {
