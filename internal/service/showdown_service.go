@@ -47,7 +47,7 @@ func Showdown(room *model.Room) {
 			"amount":  room.Pot,
 			"split":   split,
 			"hand":    winningScore.Rank.String(),
-			"cards":   winningScore.Cards,
+			"cards":   GetRelevantCards(winningScore),
 		},
 	}
 	b, _ := json.Marshal(msg)

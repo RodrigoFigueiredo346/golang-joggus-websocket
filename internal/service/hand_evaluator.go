@@ -312,3 +312,109 @@ func (h HandRank) String() string {
 		return "Unknown"
 	}
 }
+
+// GetRelevantCards returns only the cards that form the actual hand
+// For example, for "One Pair", it returns only the 2 cards of the pair
+func GetRelevantCards(score HandScore) []model.Card {
+	if len(score.Cards) == 0 {
+		return []model.Card{}
+	}
+
+	switch score.Rank {
+	case StraightFlush, Straight, Flush:
+		// All 5 cards are part of the hand
+		return score.Cards
+
+	case FourOfKind:
+		// Return the 4 cards that match
+		if len(score.Tiebreak) == 0 {
+			return score.Cards
+		}
+		fourValue := score.Tiebreak[0]
+		result := []model.Card{}
+		for _, card := range score.Cards {
+			if rankOrder[card.Rank] == fourValue {
+				result = append(result, card)
+			}
+		}
+		return result
+
+	case FullHouse:
+		// Return the 3 cards of the three of a kind and the 2 cards of the pair
+		if len(score.Tiebreak) < 2 {
+			return score.Cards
+		}
+		threeValue := score.Tiebreak[0]
+		pairValue := score.Tiebreak[1]
+		result := []model.Card{}
+		for _, card := range score.Cards {
+			cardValue := rankOrder[card.Rank]
+			if cardValue == threeValue || cardValue == pairValue {
+				result = append(result, card)
+			}
+		}
+		return result
+
+	case ThreeOfKind:
+		// Return the 3 cards that match
+		if len(score.Tiebreak) == 0 {
+			return score.Cards
+		}
+		threeValue := score.Tiebreak[0]
+		result := []model.Card{}
+		for _, card := range score.Cards {
+			if rankOrder[card.Rank] == threeValue {
+				result = append(result, card)
+			}
+		}
+		return result
+
+	case TwoPair:
+		// Return the 4 cards that form the two pairs
+		if len(score.Tiebreak) < 2 {
+			return score.Cards
+		}
+		pair1Value := score.Tiebreak[0]
+		pair2Value := score.Tiebreak[1]
+		result := []model.Card{}
+		for _, card := range score.Cards {
+			cardValue := rankOrder[card.Rank]
+			if cardValue == pair1Value || cardValue == pair2Value {
+				result = append(result, card)
+			}
+		}
+		return result
+
+	case OnePair:
+		// Return only the 2 cards that form the pair
+		if len(score.Tiebreak) == 0 {
+			return score.Cards
+		}
+		pairValue := score.Tiebreak[0]
+		result := []model.Card{}
+		for _, card := range score.Cards {
+			if rankOrder[card.Rank] == pairValue {
+				result = append(result, card)
+			}
+		}
+		return result
+
+	case HighCard:
+		// For high card, return only the highest card
+		if len(score.Cards) == 0 {
+			return []model.Card{}
+		}
+		highest := score.Cards[0]
+		highestValue := rankOrder[highest.Rank]
+		for _, card := range score.Cards {
+			if rankOrder[card.Rank] > highestValue {
+				highest = card
+				highestValue = rankOrder[card.Rank]
+			}
+		}
+		return []model.Card{highest}
+
+	default:
+		return score.Cards
+	}
+}

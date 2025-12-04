@@ -10,6 +10,6 @@ import (
 func main() {
 	http.HandleFunc("/ws", server.HandleWebSocket)
 	addr := ":8080"
-	log.Println("Joggus server running on", addr)
+	log.Println("Joggus server running on:", addr)
 	http.ListenAndServe(addr, nil)
 }
