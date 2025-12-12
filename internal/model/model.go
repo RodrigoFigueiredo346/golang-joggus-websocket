@@ -36,19 +36,20 @@ type Player struct {
 }
 
 type Room struct {
-	ID             string
-	Players        map[string]*Player
-	PlayerOrder    []string
-	CurrentPlayer  string
-	Pot            int
-	CurrentBet     int
-	MinBet         int
-	RoundNumber    int
-	GameOver       bool
-	Broadcast      chan []byte
-	Deck           *Deck
-	CommunityCards []Card
-	State          GameState
+	ID                  string
+	Players             map[string]*Player
+	PlayerOrder         []string
+	OriginalPlayerOrder []string // Master order, never changes after all players join
+	CurrentPlayer       string
+	Pot                 int
+	CurrentBet          int
+	MinBet              int
+	RoundNumber         int
+	GameOver            bool
+	Broadcast           chan []byte
+	Deck                *Deck
+	CommunityCards      []Card
+	State               GameState
 }
 
 type Server struct {

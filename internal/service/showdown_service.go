@@ -60,6 +60,9 @@ func Showdown(room *model.Room) {
 			"name":      p.Name,
 			"chips":     p.Chips,
 		}
+		if p.Active {
+			player["cards"] = p.Hand
+		}
 		players = append(players, player)
 	}
 
@@ -96,43 +99,97 @@ func resetRoomShowDown(room *model.Room) {
 		p.Hand = []model.Card{}
 	}
 
-	// Rebuild PlayerOrder from ALL players who have chips
-	// This is important because folded players are removed from PlayerOrder during the round
-	// but should be re-added if they still have chips for the next round
+	// Rebuild PlayerOrder using OriginalPlayerOrder as master reference
+	// This preserves the original join order and ensures correct dealer rotation
 
-	// First, preserve the order of players still in PlayerOrder who have chips
-	newPlayerOrder := []string{}
-	inOrder := make(map[string]bool)
+	// 1. Identify who started the previous round (Dealer/Button)
+	var lastStarterID string
+	if len(room.PlayerOrder) > 0 {
+		lastStarterID = room.PlayerOrder[0]
+	}
 
-	for _, playerID := range room.PlayerOrder {
-		p := room.Players[playerID]
+	// 2. Build list of currently active players (chips > 0) in their original relative order
+	activePlayers := []string{}
+	for _, playerID := range room.OriginalPlayerOrder {
+		p, exists := room.Players[playerID]
+		if !exists {
+			continue
+		}
 		if p.Chips > 0 {
 			p.Active = true
-			newPlayerOrder = append(newPlayerOrder, playerID)
-			inOrder[playerID] = true
+			activePlayers = append(activePlayers, playerID)
 		} else {
 			p.Active = false
 		}
 	}
 
-	// Then, add any players who were removed (folded) but still have chips
-	// We need to iterate through ALL players, not just PlayerOrder
-	for playerID, p := range room.Players {
-		if p.Chips > 0 && !inOrder[playerID] {
-			p.Active = true
-			newPlayerOrder = append(newPlayerOrder, playerID)
-			log.Printf("Re-adding player %s (had folded but still has %d chips)\n", p.Name, p.Chips)
+	if len(activePlayers) == 0 {
+		log.Println("No active players left to rebuild order")
+		return
+	}
+
+	// 3. Find the new starter (next active player after lastStarterID)
+	var newStarterID string
+
+	// Find index of lastStarter in OriginalPlayerOrder
+	lastStarterIndex := -1
+	for i, pid := range room.OriginalPlayerOrder {
+		if pid == lastStarterID {
+			lastStarterIndex = i
+			break
 		}
 	}
 
-	room.PlayerOrder = newPlayerOrder
-	log.Printf("PlayerOrder rebuilt with %d players\n", len(room.PlayerOrder))
+	if lastStarterIndex == -1 {
+		// Fallback: if last starter not found (shouldn't happen), use first active
+		newStarterID = activePlayers[0]
+	} else {
+		// Search forward from lastStarterIndex + 1 to find the first active player
+		found := false
+		for i := 1; i <= len(room.OriginalPlayerOrder); i++ {
+			idx := (lastStarterIndex + i) % len(room.OriginalPlayerOrder)
+			candidateID := room.OriginalPlayerOrder[idx]
 
-	// Rotate dealer button: move first player to the end
-	if len(room.PlayerOrder) > 1 {
-		room.PlayerOrder = append(room.PlayerOrder[1:], room.PlayerOrder[0])
-		log.Println("Dealer button rotated. New order:", room.PlayerOrder)
+			// Check if this candidate is in activePlayers
+			isActive := false
+			for _, ap := range activePlayers {
+				if ap == candidateID {
+					isActive = true
+					break
+				}
+			}
+
+			if isActive {
+				newStarterID = candidateID
+				found = true
+				break
+			}
+		}
+		if !found {
+			newStarterID = activePlayers[0]
+		}
 	}
+
+	// 4. Rotate activePlayers so newStarterID is at index 0
+	newPlayerOrder := []string{}
+	startIndex := -1
+	for i, pid := range activePlayers {
+		if pid == newStarterID {
+			startIndex = i
+			break
+		}
+	}
+
+	if startIndex != -1 {
+		newPlayerOrder = append(newPlayerOrder, activePlayers[startIndex:]...)
+		newPlayerOrder = append(newPlayerOrder, activePlayers[:startIndex]...)
+	} else {
+		newPlayerOrder = activePlayers
+	}
+
+	room.PlayerOrder = newPlayerOrder
+	log.Printf("PlayerOrder rebuilt. Last Starter: %s, New Starter: %s, Order: %v\n",
+		lastStarterID, newStarterID, room.PlayerOrder)
 }
 
 func startNewRoundShowDown(room *model.Room) {

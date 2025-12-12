@@ -267,30 +267,9 @@ func DealRiver(room *model.Room) {
 	room.Broadcast <- b
 
 	log.Printf("river dealt in room %s\n", room.ID)
-	// NextPhase(room)
 
 }
 
-// func NextPhase(room *model.Room) {
-// 	log.Println("TROCANDO DE FASE:")
-// 	log.Println("fase atual: ", room.State)
-// 	switch room.State {
-// 	case model.StateWaiting:
-// 		room.State = model.StatePreflop
-// 	case model.StatePreflop:
-// 		room.State = model.StateFlop
-// 	case model.StateFlop:
-// 		room.State = model.StateTurn
-// 	case model.StateTurn:
-// 		room.State = model.StateRiver
-// 	case model.StateRiver:
-// 		room.State = model.StateShowdown
-// 	case model.StateShowdown:
-// 		room.State = model.StateWaiting
-// 	}
-// 	log.Println("fase nova: ", room.State)
-
-// }
 
 func resetAct(room *model.Room) {
 	for _, p := range room.Players {

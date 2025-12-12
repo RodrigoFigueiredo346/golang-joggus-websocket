@@ -28,17 +28,8 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 	case "fold":
 		p.Active = false
 		log.Printf("%s folded\n", p.Name)
-		// Remove player from PlayerOrder during this round
-		for i, id := range room.PlayerOrder {
-			if id == p.ID {
-				room.PlayerOrder = append(room.PlayerOrder[:i], room.PlayerOrder[i+1:]...)
-				break
-			}
-		}
-		// Adjust current player index if needed
-		if len(room.PlayerOrder) == 0 {
-			room.CurrentPlayer = ""
-		}
+		// Do NOT remove from PlayerOrder, otherwise NextPlayer loses track of position
+		// NextPlayer will skip inactive players automatically
 	case "check":
 		log.Println("room.CurrentBet: ", room.CurrentBet)
 		if room.CurrentBet > 0 {

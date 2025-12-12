@@ -31,17 +31,18 @@ func CreateRoom(conn *websocket.Conn, playerID, playerName string) {
 	go playerWriter(player)
 
 	room := &model.Room{
-		ID:             roomID,
-		Players:        make(map[string]*model.Player),
-		Broadcast:      make(chan []byte, 10),
-		Deck:           nil,
-		CommunityCards: []model.Card{},
-		State:          model.StateWaiting,
-		Pot:            0,
-		CurrentBet:     0,
-		MinBet:         10,
-		RoundNumber:    0,
-		PlayerOrder:    []string{playerID},
+		ID:                  roomID,
+		Players:             make(map[string]*model.Player),
+		Broadcast:           make(chan []byte, 10),
+		Deck:                nil,
+		CommunityCards:      []model.Card{},
+		State:               model.StateWaiting,
+		Pot:                 0,
+		CurrentBet:          0,
+		MinBet:              10,
+		RoundNumber:         0,
+		PlayerOrder:         []string{playerID},
+		OriginalPlayerOrder: []string{playerID},
 	}
 
 	room.Players[playerID] = player
@@ -110,8 +111,9 @@ func JoinRoom(conn *websocket.Conn, playerID, roomID, playerName string) {
 	// Adiciona o jogador na sala antes de criar o snapshot
 	room.Players[playerID] = player
 
-	// (se quiser, mantém ordem também)
+	// Mantém ordem dos jogadores
 	room.PlayerOrder = append(room.PlayerOrder, playerID)
+	room.OriginalPlayerOrder = append(room.OriginalPlayerOrder, playerID)
 
 	// Agora sim monta snapshot completo
 	playersSnapshot := []map[string]any{}
