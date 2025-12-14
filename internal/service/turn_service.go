@@ -152,11 +152,21 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 		// Award pot to the winner
 		lastActive.Chips += room.Pot
 
+		// Construir array de winners com informações detalhadas
+		winners := []map[string]any{
+			{
+				"player_id": lastActive.ID,
+				"hand":      "win by fold",
+				"cards":     []model.Card{},
+				"amount":    room.Pot,
+			},
+		}
+
 		winMsg := map[string]any{
-			"method": "automatic_win",
+			"method": "showdown",
 			"params": map[string]any{
-				"winner": lastActive.Name,
-				"amount": room.Pot,
+				"winners": winners,
+				"pot":     0,
 			},
 		}
 		winBytes, _ := json.Marshal(winMsg)
@@ -167,9 +177,10 @@ func PlayerAction(room *model.Room, playerID, action string, amount int) {
 
 		// Reset and start new round
 		resetRoomShowDown(room)
-		if !checkGameOverShowDown(room) {
-			go startNewRoundShowDown(room)
-		}
+		checkGameOverShowDown(room)
+		// if !checkGameOverShowDown(room) {
+		// 	go startNewRoundShowDown(room)
+		// }
 		return
 	}
 
